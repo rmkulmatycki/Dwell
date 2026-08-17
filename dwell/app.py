@@ -1,11 +1,7 @@
-"""Main loop: camera + HUD + hotkeys.
+"""Main loop: nose moves the cursor, blink clicks, hands stay on the keys.
 
-All controls are F-keys (or Ctrl+Alt chords) so you can still type.
-
-F8 pause   F7 recenter   F6 practice   F5 gaze/nose
-F3 slower  F4 faster     F9 dwell-click   F10 quit
-
-Look to aim. Double-blink or hold eyes shut to click.
+F8 pause   F7 recenter   F6 practice
+F3 slower  F4 faster     F10 quit
 """
 
 from __future__ import annotations
@@ -17,6 +13,7 @@ import cv2
 from pynput import keyboard
 
 from dwell.blink import BlinkClicker
+from dwell.overlay import pin_overlay
 from dwell.pointer import HeadPointer
 from dwell.practice import PracticeBoard
 from dwell.track import FaceTracker
@@ -104,8 +101,13 @@ def main() -> int:
     listener = keyboard.Listener(on_press=on_press, on_release=on_release)
     listener.start()
 
+    hud_w, hud_h = 380, 300
+    hud_x = max(0, pointer.screen_w - hud_w - 16)
+    hud_y = 16
     cv2.namedWindow(HUD, cv2.WINDOW_NORMAL)
-    cv2.resizeWindow(HUD, 720, 640)
+    cv2.resizeWindow(HUD, hud_w, hud_h)
+    cv2.moveWindow(HUD, hud_x, hud_y)
+    last_pin = 0.0
 
     try:
         while running:
@@ -136,6 +138,9 @@ def main() -> int:
 
             _draw_hud(frame, state, face, blinker, now < flash_until)
             cv2.imshow(HUD, frame)
+            if now - last_pin > 1.0:
+                pin_overlay(HUD, hud_x, hud_y, hud_w, hud_h)
+                last_pin = now
             try:
                 practice.draw()
             except Exception as exc:
@@ -156,26 +161,25 @@ def _draw_hud(frame, state, face, blinker: BlinkClicker, flash: bool) -> None:
     cv2.rectangle(overlay, (0, 0), (w, panel_h), (0, 0, 0), -1)
     cv2.addWeighted(overlay, 0.72, frame, 0.28, 0, frame)
 
-    src = "GAZE" if face.source == "gaze" else "NOSE"
     if not face.seen:
-        mode = "NO FACE — sit in the light until you see dots on your eyes"
+        mode = "NO FACE — sit in the light, green dot on your nose"
         color = (0, 80, 255)
-        steps = ["This window is the camera. Watch the Windows mouse on your desktop."]
+        steps = ["Tiny camera HUD. Type in Cursor. F8 starts the mouse."]
     elif state.paused:
-        mode = f"PAUSED — {src} tracking. Mouse is NOT taken over yet."
+        mode = "PAUSED — nose tracking. Keyboard is yours."
         color = (0, 200, 255)
         steps = [
-            "Look at the MIDDLE of the monitor.  F8 starts (Ctrl+Alt+P if Fn is brightness).",
-            "Double-blink or hold eyes shut to click.  F6 practice.  F10 quits.",
-            "F3 slower  F4 faster  F5 nose/gaze  F7 recenter",
+            "Look at screen center. F8 (or Ctrl+Alt+P) starts.",
+            "Tilt your head to move. Double-blink to click.",
+            "F7 recenter  F3/F4 speed  F10 quit",
         ]
     else:
-        mode = f"LIVE — {src}    look to move, blink to click"
+        mode = "LIVE — nose moves cursor, blink clicks"
         color = (0, 220, 120)
         hit_txt = f"{state.hits}/{state.clicks}" if state.clicks else "0/0"
         steps = [
-            f"Gain {state.gain:.1f}   meant-it {hit_txt}    F3/F4 speed   F8 pause   F10 quit",
-            "Click: two blinks, or close eyes until the bar fills",
+            f"Gain {state.gain:.1f}   clicks {hit_txt}    F8 pause   F7 recenter",
+            "Double-blink to click. Hold shut if the bar is easier.",
         ]
         if flash:
             mode = "CLICK"

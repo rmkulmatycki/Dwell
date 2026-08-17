@@ -35,7 +35,7 @@ class PointerState:
     seen: bool = False
     dwell_progress: float = 0.0  # 0–1 while holding still
     dwell_ms: int = 1100
-    gain: float = 9.0
+    gain: float = 12.0
     last_click_ms: int | None = None
     hits: int = 0
     clicks: int = 0
@@ -48,15 +48,15 @@ class HeadPointer:
     def __init__(self, metrics_path: Path):
         self.screen_w, self.screen_h = _screen_size()
         self.mouse = Controller()
-        self.fx = OneEuro(min_cutoff=0.16, beta=0.001)
-        self.fy = OneEuro(min_cutoff=0.16, beta=0.001)
+        self.fx = OneEuro(min_cutoff=0.45, beta=0.006)
+        self.fy = OneEuro(min_cutoff=0.45, beta=0.006)
         self.rest_x = 0.5
         self.rest_y = 0.45
-        self.gain = 9.0
+        self.gain = 12.0
         self.paused = True
         self.click_enabled = False
-        self.deadzone = 26.0
-        self.max_step = 38.0
+        self.deadzone = 10.0
+        self.max_step = 90.0
         self._ever_centered = False
         self._out: tuple[float, float] | None = None
         self._still_since: float | None = None

@@ -1,32 +1,29 @@
 # Dwell
 
-Gaze-tracked pointer + blink-click for Windows. Look to move. Double-blink or hold your eyes shut to click.
+Nose moves the Windows cursor. A double blink (or a held blink) clicks. Hands stay on the keyboard.
 
-This is **not** a medical device, not mind-reading, and not a Neuralink implant.
+Built so you can click around Cursor without grabbing a mouse.
 
-Controls are **F-keys** (and Ctrl+Alt backups) so you can still type. Letters, Space, and Esc do nothing.
+This is **not** a medical device.
 
 ## Run
 
-1. Double-click `run.bat`. Allow the camera if Windows asks.
-2. Yellow dots on the eyes = gaze tracking. This window is only the camera — watch the Windows mouse.
-3. Look at the **middle of the monitor**, press **F8** (or **Ctrl+Alt+P** if F8 is brightness).
-4. Look around to move. A single blink does nothing.
-5. **Two blinks** in about a second clicks. Or hold your eyes shut until the bottom bar fills.
-6. **F6** is target practice. **F10** quits.
+1. Double-click `run.bat`. Allow the camera.
+2. A small camera HUD sits in the top-right and should **not** steal focus from Cursor.
+3. Look at the middle of the monitor, press **F8** (or **Ctrl+Alt+P**).
+4. Tilt your head to move the cursor. **Double-blink** to click.
+5. **F7** recenters if you shift in your chair. **F10** quits.
 
-If F-keys control volume/brightness, hold **Fn**, or use the Ctrl+Alt shortcuts.
+Type normally. Dwell only listens to F-keys and Ctrl+Alt shortcuts.
 
 | Key | Backup | What it does |
 |-----|--------|----------------|
-| F8 | Ctrl+Alt+P | Start / pause (recenters) |
+| F8 | Ctrl+Alt+P | Start / pause |
 | F7 | Ctrl+Alt+R | Recenter |
 | F6 | Ctrl+Alt+T | Target practice |
-| F5 | Ctrl+Alt+G | Gaze or nose |
-| F3 / F4 | Ctrl+Alt+- / Ctrl+Alt+= | Slower / faster |
-| F9 | | Old dwell-click (hold still) |
+| F3 / F4 | Ctrl+Alt+- / = | Slower / faster |
 | F10 | Ctrl+Alt+Q | Quit |
 
-Clicks append to `metrics.csv`.
+If F-keys are brightness/volume, hold Fn or use Ctrl+Alt.
 
-Python 3.11 is required (3.14 is too new for MediaPipe).
+Python 3.11 is required.
