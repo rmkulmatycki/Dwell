@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass
+from types import SimpleNamespace
+import time
 
 import cv2
 import mediapipe as mp
@@ -30,6 +32,7 @@ class FaceSignal:
     ear: float
     eyes_closed: bool
     gaze_ok: bool
+    unstable: bool
 
 
 class FaceTracker:
@@ -55,18 +58,26 @@ class FaceTracker:
         self._gx = _SignalSmooth()
         self._gy = _SignalSmooth()
         self._held: tuple[float, float] | None = None
+        self._open_ear = 0.30
+        self._hold_until = 0.0
+
+    def toggle_gaze(self) -> None:
+        self.prefer_gaze = not self.prefer_gaze
+        self._gx.reset()
+        self._gy.reset()
+        self._held = None
 
     def read(self):
         ok, frame = self.cap.read()
         if not ok or frame is None:
-            return None, FaceSignal(0.0, 0.0, False, "nose", 0.3, False, False)
+            return None, FaceSignal(0.0, 0.0, False, "nose", 0.3, False, False, False)
 
         frame = cv2.flip(frame, 1)
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         rgb.flags.writeable = False
         result = self._mesh.process(rgb)
 
-        blank = FaceSignal(0.0, 0.0, False, "nose", 0.3, False, False)
+        blank = FaceSignal(0.0, 0.0, False, "nose", 0.3, False, False, False)
         if not result.multi_face_landmarks:
             self._gx.reset()
             self._gy.reset()
@@ -77,7 +88,13 @@ class FaceTracker:
         h, w = frame.shape[:2]
         nose = lm[NOSE_TIP]
         ear = 0.5 * (_ear(lm, LEFT_EYE) + _ear(lm, RIGHT_EYE))
-        closed = ear < 0.19
+        if ear > self._open_ear * 0.9:
+            self._open_ear = 0.95 * self._open_ear + 0.05 * ear
+        squint = ear < self._open_ear * 0.85
+        closed = ear < max(0.12, self._open_ear * 0.55)
+        if squint:
+            self._hold_until = time.perf_counter() + 0.20
+        freeze_gaze = squint or time.perf_counter() < self._hold_until
         gaze_ok = False
         gx, gy = 0.0, 0.0
 
@@ -85,29 +102,31 @@ class FaceTracker:
             try:
                 left_c = _iris_center(lm, range(473, 478))
                 right_c = _iris_center(lm, range(468, 473))
-                lx, ly = _offset(left_c, lm, LEFT_EYE)
-                rx, ry = _offset(right_c, lm, RIGHT_EYE)
-                gx = 0.5 * (lx + rx)
-                gy = 0.5 * (ly + ry)
-                gx = max(-0.4, min(0.4, gx))
-                gy = max(-0.4, min(0.4, gy))
-                # Partial blinks make the iris jump. Hold last stable gaze.
-                if ear < 0.22 and self._held is not None:
-                    gx, gy = self._held
+                if freeze_gaze:
+                    if self._held is not None:
+                        gx, gy = self._held
+                        gaze_ok = True
                 else:
+                    lx, ly = _offset(left_c, lm, LEFT_EYE)
+                    rx, ry = _offset(right_c, lm, RIGHT_EYE)
+                    gx = max(-0.4, min(0.4, 0.5 * (lx + rx)))
+                    gy = max(-0.4, min(0.4, 0.5 * (ly + ry)))
                     gx = self._gx(gx)
                     gy = self._gy(gy)
                     self._held = (gx, gy)
-                gaze_ok = True
-                _dot(frame, left_c, w, h, (255, 200, 0))
-                _dot(frame, right_c, w, h, (255, 200, 0))
+                    gaze_ok = True
+                if gaze_ok:
+                    _dot(frame, left_c, w, h, (255, 200, 0))
+                    _dot(frame, right_c, w, h, (255, 200, 0))
             except (IndexError, ZeroDivisionError):
                 gaze_ok = False
 
         if gaze_ok:
-            signal = FaceSignal(gx, gy, True, "gaze", ear, closed, True)
+            signal = FaceSignal(gx, gy, True, "gaze", ear, closed, True, freeze_gaze)
         else:
-            signal = FaceSignal(float(nose.x), float(nose.y), True, "nose", ear, closed, False)
+            signal = FaceSignal(
+                float(nose.x), float(nose.y), True, "nose", ear, closed, False, freeze_gaze
+            )
 
         color = (0, 80, 255) if closed else (0, 220, 120)
         _dot(frame, nose, w, h, color, 6)
@@ -136,12 +155,7 @@ def _ear(lm, eye: tuple[int, int, int, int, int, int]) -> float:
 def _iris_center(lm, indices):
     xs = [lm[i].x for i in indices]
     ys = [lm[i].y for i in indices]
-
-    class _P:
-        x = sum(xs) / len(xs)
-        y = sum(ys) / len(ys)
-
-    return _P()
+    return SimpleNamespace(x=sum(xs) / len(xs), y=sum(ys) / len(ys))
 
 
 def _offset(iris, lm, eye: tuple[int, int, int, int, int, int]) -> tuple[float, float]:

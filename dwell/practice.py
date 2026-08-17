@@ -82,7 +82,7 @@ class PracticeBoard:
         acc = f"{self.hits}/{self.tries}" if self.tries else "0/0"
         cv2.putText(
             frame,
-            f"Look at the circle. Double-blink or hold eyes shut.  Hits {acc}    P close",
+            f"Look at the circle. Double-blink or hold eyes shut.  Hits {acc}    F6 close",
             (24, 40),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.7,
