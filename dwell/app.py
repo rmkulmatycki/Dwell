@@ -134,16 +134,11 @@ def main() -> int:
             now = time.perf_counter()
             if not face.seen:
                 last_lost = now
-            looking_down = face.seen and (face.y - pointer.rest_y) > 0.045
-            face_recent = (now - last_lost) > 0.55
-            allow_blink = (
-                face.seen
-                and not pointer.paused
-                and face_recent
-                and not looking_down
-            )
+            face_recent = (now - last_lost) > 0.40
+            allow_blink = face.seen and not pointer.paused and face_recent
             fired = blinker.update(face.ear, now, allow=allow_blink)
-            freeze = blinker.closed or looking_down or not face.seen or not face_recent
+            # Freeze only when the face is gone (keyboard glance), not when aiming at the bottom of the screen.
+            freeze = blinker.closed or not face.seen
             before_clicks = pointer.clicks
             state = pointer.update(face.x, face.y, face.seen, now, freeze=freeze)
             if fired:
@@ -160,7 +155,6 @@ def main() -> int:
                 face,
                 blinker,
                 now < flash_until,
-                looking_down=looking_down,
                 face_lost=not face.seen,
             )
             cv2.imshow(HUD, frame)
@@ -186,7 +180,6 @@ def _draw_hud(
     face,
     blinker: BlinkClicker,
     flash: bool,
-    looking_down: bool = False,
     face_lost: bool = False,
 ) -> None:
     h, w = frame.shape[:2]
@@ -198,11 +191,7 @@ def _draw_hud(
     if face_lost or not face.seen:
         mode = "LOOK AT THE SCREEN — clicks off (face not in camera)"
         color = (0, 80, 255)
-        steps = ["Glance at the keys is fine. Cursor and blink-click freeze until you're back."]
-    elif looking_down:
-        mode = "LOOKING DOWN — clicks off so the keyboard is safe"
-        color = (0, 200, 255)
-        steps = ["Look back at the monitor to move and blink-click again. F1 still clicks."]
+        steps = ["Glance at the keys is fine. Cursor freezes until your face is back."]
     elif state.paused:
         mode = "PAUSED — nose tracking. Keyboard is yours."
         color = (0, 200, 255)
@@ -217,7 +206,7 @@ def _draw_hud(
         hit_txt = f"{state.hits}/{state.clicks}" if state.clicks else "0/0"
         steps = [
             f"Gain {state.gain:.1f}  clicks {hit_txt}  ear {blinker.ear:.2f}/{blinker.open_level:.2f}  F1 click",
-            "Two quick blinks = click. Looking at the keys will not click.",
+            "Two quick blinks = click. If the camera loses your face, clicks pause.",
         ]
         if flash:
             mode = "CLICK"
