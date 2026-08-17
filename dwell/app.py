@@ -39,8 +39,7 @@ def main() -> int:
                 pointer.toggle_pause()
                 return
             if key == keyboard.Key.f2:
-                practice.toggle()
-                pointer.set_clicks(practice.on)
+                practice.request_toggle()
                 return
             if key == keyboard.Key.f9:
                 pointer.toggle_clicks()
@@ -53,12 +52,11 @@ def main() -> int:
         if ch == "c":
             pointer.request_recenter()
         elif ch == "p":
-            practice.toggle()
-            pointer.set_clicks(practice.on)
+            practice.request_toggle()
         elif ch == "[":
-            pointer.nudge_gain(-1.5)
+            pointer.nudge_gain(-2.0)
         elif ch == "]":
-            pointer.nudge_gain(1.5)
+            pointer.nudge_gain(2.0)
 
     listener = keyboard.Listener(on_press=on_press)
     listener.start()
@@ -76,6 +74,15 @@ def main() -> int:
             if pointer.recenter_next and face.seen:
                 pointer.recenter(face.x, face.y)
 
+            try:
+                practice.sync()
+            except Exception as exc:
+                print(f"Practice window failed: {exc}")
+            if practice.just_opened:
+                pointer.set_clicks(True)
+            elif practice.just_closed:
+                pointer.set_clicks(False)
+
             now = time.perf_counter()
             before_clicks = pointer.clicks
             state = pointer.update(face.x, face.y, face.seen, now)
@@ -84,7 +91,10 @@ def main() -> int:
 
             _draw_hud(frame, state, face.seen)
             cv2.imshow(HUD, frame)
-            practice.draw()
+            try:
+                practice.draw()
+            except Exception as exc:
+                print(f"Practice draw failed: {exc}")
 
             # waitKey is required or OpenCV windows freeze. 1 ms keeps the loop fast.
             key = cv2.waitKey(1) & 0xFF

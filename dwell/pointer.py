@@ -35,7 +35,7 @@ class PointerState:
     seen: bool = False
     dwell_progress: float = 0.0  # 0–1 while holding still
     dwell_ms: int = 1100
-    gain: float = 5.5
+    gain: float = 12.0
     last_click_ms: int | None = None
     hits: int = 0
     clicks: int = 0
@@ -48,11 +48,11 @@ class HeadPointer:
     def __init__(self, metrics_path: Path):
         self.screen_w, self.screen_h = _screen_size()
         self.mouse = Controller()
-        self.fx = OneEuro(min_cutoff=0.35, beta=0.003)
-        self.fy = OneEuro(min_cutoff=0.35, beta=0.003)
+        self.fx = OneEuro(min_cutoff=0.55, beta=0.008)
+        self.fy = OneEuro(min_cutoff=0.55, beta=0.008)
         self.rest_x = 0.5
         self.rest_y = 0.45
-        self.gain = 5.5
+        self.gain = 12.0
         self.paused = True
         self.click_enabled = False
         self._ever_centered = False
@@ -90,7 +90,7 @@ class HeadPointer:
             self.mouse.position = (int(self._out[0]), int(self._out[1]))
 
     def nudge_gain(self, delta: float) -> None:
-        self.gain = max(2.0, min(24.0, self.gain + delta))
+        self.gain = max(2.0, min(40.0, self.gain + delta))
 
     def toggle_clicks(self) -> None:
         self.click_enabled = not self.click_enabled
@@ -149,11 +149,10 @@ class HeadPointer:
             self._out = (sx, sy)
         dx = sx - self._out[0]
         dy = sy - self._out[1]
-        if (dx * dx + dy * dy) ** 0.5 < 10:
+        if (dx * dx + dy * dy) ** 0.5 < 6:
             sx, sy = self._out
         else:
-            # Cap how far the cursor can jump in one frame.
-            max_step = 55.0
+            max_step = 160.0
             dist = (dx * dx + dy * dy) ** 0.5
             if dist > max_step:
                 sx = self._out[0] + dx / dist * max_step

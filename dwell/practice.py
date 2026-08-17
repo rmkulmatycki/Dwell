@@ -1,8 +1,13 @@
-"""On-screen targets so you can measure hits instead of guessing."""
+"""On-screen targets so you can measure hits instead of guessing.
+
+OpenCV windows must be created on the main thread. The keyboard listener
+only flips a flag; sync() does the actual window work.
+"""
 
 from __future__ import annotations
 
 import random
+import threading
 
 import cv2
 import numpy as np
@@ -19,22 +24,41 @@ class PracticeBoard:
         self.target = (WIN_W // 2, WIN_H // 2)
         self.hits = 0
         self.tries = 0
+        self.just_opened = False
+        self.just_closed = False
+        self._want = False
+        self._window_up = False
+        self._lock = threading.Lock()
         self._place()
 
-    def toggle(self) -> None:
-        self.on = not self.on
-        if self.on:
+    def request_toggle(self) -> None:
+        with self._lock:
+            self._want = not self._want
+
+    def sync(self) -> None:
+        """Create or destroy the window. Call from the main loop only."""
+        self.just_opened = False
+        self.just_closed = False
+        with self._lock:
+            want = self._want
+        if want and not self._window_up:
             cv2.namedWindow(WINDOW, cv2.WINDOW_NORMAL)
             cv2.resizeWindow(WINDOW, WIN_W, WIN_H)
             cv2.moveWindow(WINDOW, WIN_X, WIN_Y)
             self.hits = 0
             self.tries = 0
             self._place()
-        else:
+            self.on = True
+            self._window_up = True
+            self.just_opened = True
+        elif not want and self._window_up:
             try:
                 cv2.destroyWindow(WINDOW)
             except cv2.error:
                 pass
+            self.on = False
+            self._window_up = False
+            self.just_closed = True
 
     def on_click(self, screen_x: float, screen_y: float) -> None:
         if not self.on:
@@ -58,7 +82,7 @@ class PracticeBoard:
         acc = f"{self.hits}/{self.tries}" if self.tries else "0/0"
         cv2.putText(
             frame,
-            f"Hold still on the circle.  Hits {acc}    F2 close",
+            f"Hold still on the circle.  Hits {acc}    P or F2 close",
             (24, 40),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.7,
