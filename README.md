@@ -9,18 +9,19 @@ This is **not** a medical device, not mind-reading, and not a Neuralink implant.
 1. Plug in / open the laptop webcam.
 2. Double-click `run.bat`.
 3. The first run installs libraries (a few minutes). Allow the camera if Windows asks.
-4. Sit in good light. You should see a green dot on your nose.
-5. Look at the **center of the screen** and press **C**.
-6. Press **F8**. The mouse is now driven by your head. **Esc** always quits.
+4. Sit in good light. You should see a green dot on your nose. The Dwell window is **only the camera** — watch the Windows mouse on your desktop.
+5. Look at the **middle of the monitor**, sit still, press **Space**. Head tilts now move the cursor. It starts in **move-only** (no clicking).
+6. If the cursor is still wild, mash **[** a few times (slower). **Space** pauses. **Esc** quits.
+7. **P** or **F2** opens target practice and turns clicking on. Hold still on a circle to click it.
 
-If the cursor flies around, press F8 (pause), press C again, then F8.
+On many laptops F8 is brightness — use **Space** instead.
 
 | Key | What it does |
 |-----|----------------|
-| F8 | Start / pause mouse control (starts paused on purpose) |
-| C | Recenter — wherever your nose is becomes screen center |
-| `[` `]` | Need more / less head movement to cross the screen |
-| F2 | Target practice (this is how we get a hit rate) |
+| Space / F8 | Start / pause. Also recenters so your current head pose is screen-center. |
+| `[` `]` | Slower / faster |
+| P / F2 | Target practice + clicking |
+| F9 | Toggle clicking on the desktop |
 | Esc | Quit |
 
 Clicks and “did you mean it” scores append to `metrics.csv`. That file is your evidence. Keep it.

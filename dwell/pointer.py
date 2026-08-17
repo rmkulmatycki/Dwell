@@ -34,11 +34,12 @@ class PointerState:
     paused: bool = True
     seen: bool = False
     dwell_progress: float = 0.0  # 0–1 while holding still
-    dwell_ms: int = 850
-    gain: float = 14.0
+    dwell_ms: int = 1100
+    gain: float = 5.5
     last_click_ms: int | None = None
     hits: int = 0
     clicks: int = 0
+    click_enabled: bool = False
     screen_w: int = 1920
     screen_h: int = 1080
 
@@ -47,14 +48,17 @@ class HeadPointer:
     def __init__(self, metrics_path: Path):
         self.screen_w, self.screen_h = _screen_size()
         self.mouse = Controller()
-        self.fx = OneEuro(min_cutoff=1.0, beta=0.008)
-        self.fy = OneEuro(min_cutoff=1.0, beta=0.008)
+        self.fx = OneEuro(min_cutoff=0.35, beta=0.003)
+        self.fy = OneEuro(min_cutoff=0.35, beta=0.003)
         self.rest_x = 0.5
         self.rest_y = 0.45
-        self.gain = 14.0
+        self.gain = 5.5
         self.paused = True
+        self.click_enabled = False
+        self._ever_centered = False
+        self._out: tuple[float, float] | None = None
         self._still_since: float | None = None
-        self.dwell_s = 0.85
+        self.dwell_s = 1.10
         self.min_dwell = 0.45
         self.max_dwell = 1.45
         self.still_px = 22.0
@@ -80,15 +84,35 @@ class HeadPointer:
         self.fy.reset()
         self._still_since = None
         self.recenter_next = False
+        self._out = (self.screen_w * 0.5, self.screen_h * 0.5)
+        self._prev_pos = None
+        if not self.paused:
+            self.mouse.position = (int(self._out[0]), int(self._out[1]))
 
     def nudge_gain(self, delta: float) -> None:
-        self.gain = max(4.0, min(40.0, self.gain + delta))
+        self.gain = max(2.0, min(24.0, self.gain + delta))
+
+    def toggle_clicks(self) -> None:
+        self.click_enabled = not self.click_enabled
+        self._still_since = None
+
+    def set_clicks(self, on: bool) -> None:
+        self.click_enabled = on
+        self._still_since = None
 
     def toggle_pause(self) -> None:
         self.paused = not self.paused
         self._still_since = None
         if self.paused:
             self._pending_judge = None
+            return
+        # Unpausing: treat current head pose as "center of screen"
+        # so the cursor does not jump to a random corner.
+        self.recenter_next = True
+        self.fx.reset()
+        self.fy.reset()
+        self._out = None
+        self._prev_pos = None
 
     def update(self, nx: float, ny: float, seen: bool, now: float) -> PointerState:
         if self._pending_judge is not None:
@@ -105,16 +129,36 @@ class HeadPointer:
                 self._pending_judge = None
 
         progress = 0.0
+        if seen and not self._ever_centered:
+            self.recenter(nx, ny)
+            self._ever_centered = True
+
         if not seen or self.paused:
             self._still_since = None
             return self._state(seen, progress)
 
-        sx = self.screen_w * 0.5 + (nx - self.rest_x) * self.screen_w * (self.gain / 10.0)
-        sy = self.screen_h * 0.5 + (ny - self.rest_y) * self.screen_h * (self.gain / 10.0)
-        sx = min(self.screen_w - 2, max(1, sx))
-        sy = min(self.screen_h - 2, max(1, sy))
-        sx = self.fx(sx, now)
-        sy = self.fy(sy, now)
+        raw_x = self.screen_w * 0.5 + (nx - self.rest_x) * self.screen_w * (self.gain / 10.0)
+        raw_y = self.screen_h * 0.5 + (ny - self.rest_y) * self.screen_h * (self.gain / 10.0)
+        raw_x = min(self.screen_w - 2, max(1, raw_x))
+        raw_y = min(self.screen_h - 2, max(1, raw_y))
+        sx = self.fx(raw_x, now)
+        sy = self.fy(raw_y, now)
+
+        # Deadzone: ignore tiny wobble so the cursor can actually sit still.
+        if self._out is None:
+            self._out = (sx, sy)
+        dx = sx - self._out[0]
+        dy = sy - self._out[1]
+        if (dx * dx + dy * dy) ** 0.5 < 10:
+            sx, sy = self._out
+        else:
+            # Cap how far the cursor can jump in one frame.
+            max_step = 55.0
+            dist = (dx * dx + dy * dy) ** 0.5
+            if dist > max_step:
+                sx = self._out[0] + dx / dist * max_step
+                sy = self._out[1] + dy / dist * max_step
+            self._out = (sx, sy)
 
         self.mouse.position = (int(sx), int(sy))
 
@@ -124,6 +168,10 @@ class HeadPointer:
         self._prev_pos = (sx, sy)
 
         if now - self._last_click_t < self.cooldown_s:
+            self._still_since = None
+            return self._state(seen, 0.0)
+
+        if not self.click_enabled:
             self._still_since = None
             return self._state(seen, 0.0)
 
@@ -163,6 +211,7 @@ class HeadPointer:
             last_click_ms=self.last_click_ms,
             hits=self.hits,
             clicks=self.clicks,
+            click_enabled=self.click_enabled,
             screen_w=self.screen_w,
             screen_h=self.screen_h,
         )
