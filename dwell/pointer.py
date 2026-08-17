@@ -35,7 +35,7 @@ class PointerState:
     seen: bool = False
     dwell_progress: float = 0.0  # 0–1 while holding still
     dwell_ms: int = 1100
-    gain: float = 16.0
+    gain: float = 9.0
     last_click_ms: int | None = None
     hits: int = 0
     clicks: int = 0
@@ -48,13 +48,15 @@ class HeadPointer:
     def __init__(self, metrics_path: Path):
         self.screen_w, self.screen_h = _screen_size()
         self.mouse = Controller()
-        self.fx = OneEuro(min_cutoff=0.55, beta=0.008)
-        self.fy = OneEuro(min_cutoff=0.55, beta=0.008)
+        self.fx = OneEuro(min_cutoff=0.16, beta=0.001)
+        self.fy = OneEuro(min_cutoff=0.16, beta=0.001)
         self.rest_x = 0.5
         self.rest_y = 0.45
-        self.gain = 16.0
+        self.gain = 9.0
         self.paused = True
         self.click_enabled = False
+        self.deadzone = 26.0
+        self.max_step = 38.0
         self._ever_centered = False
         self._out: tuple[float, float] | None = None
         self._still_since: float | None = None
@@ -88,6 +90,22 @@ class HeadPointer:
         self._prev_pos = None
         if not self.paused:
             self.mouse.position = (int(self._out[0]), int(self._out[1]))
+
+    def set_input(self, source: str) -> None:
+        if source == "gaze":
+            self.fx.min_cutoff = 0.16
+            self.fy.min_cutoff = 0.16
+            self.fx.beta = 0.001
+            self.fy.beta = 0.001
+            self.deadzone = 26.0
+            self.max_step = 38.0
+        else:
+            self.fx.min_cutoff = 0.45
+            self.fy.min_cutoff = 0.45
+            self.fx.beta = 0.006
+            self.fy.beta = 0.006
+            self.deadzone = 10.0
+            self.max_step = 90.0
 
     def nudge_gain(self, delta: float) -> None:
         self.gain = max(2.0, min(50.0, self.gain + delta))
@@ -165,10 +183,10 @@ class HeadPointer:
             self._out = (sx, sy)
         dx = sx - self._out[0]
         dy = sy - self._out[1]
-        if (dx * dx + dy * dy) ** 0.5 < 6:
+        if (dx * dx + dy * dy) ** 0.5 < self.deadzone:
             sx, sy = self._out
         else:
-            max_step = 160.0
+            max_step = self.max_step
             dist = (dx * dx + dy * dy) ** 0.5
             if dist > max_step:
                 sx = self._out[0] + dx / dist * max_step

@@ -59,6 +59,9 @@ def main() -> int:
             pointer.request_recenter()
         elif ch == "g":
             tracker.prefer_gaze = not tracker.prefer_gaze
+            tracker._gx.reset()
+            tracker._gy.reset()
+            tracker._held = None
             pointer.request_recenter()
         elif ch == "p":
             practice.request_toggle()
@@ -82,6 +85,7 @@ def main() -> int:
 
             if pointer.recenter_next and face.seen:
                 pointer.recenter(face.x, face.y)
+            pointer.set_input(face.source)
 
             try:
                 practice.sync()
