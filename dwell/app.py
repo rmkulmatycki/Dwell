@@ -127,7 +127,7 @@ def main() -> int:
 
             now = time.perf_counter()
             fired = blinker.update(face.ear, now, allow=face.seen and not pointer.paused)
-            freeze = blinker.closed or blinker.unstable or face.eyes_closed or face.unstable
+            freeze = blinker.closed
             before_clicks = pointer.clicks
             state = pointer.update(face.x, face.y, face.seen, now, freeze=freeze)
             if fired:

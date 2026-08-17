@@ -1,9 +1,7 @@
 """Intentional blink → click.
 
-Any close→open that isn't a long hold counts as a blink.
-Two blinks within a second = click. Holding shut ~0.5s also clicks.
-
-Hysteresis so webcam EAR flicker doesn't eat the double blink.
+Calibrates to your open-eye size first so a normal face is not treated as
+always-blinking (that froze the cursor).
 """
 
 from __future__ import annotations
@@ -13,12 +11,13 @@ class BlinkClicker:
     LONG_S = 0.50
     BLINK_MIN_S = 0.04
     DOUBLE_S = 0.95
+    BOOT_FRAMES = 12
 
     def __init__(self) -> None:
-        self.open_ear = 0.30
+        self.open_ear = 0.0
         self.closed = False
         self.progress = 0.0
-        self.unstable = False
+        self._boot: list[float] = []
         self._closed_since: float | None = None
         self._fired_this_close = False
         self._blinks: list[float] = []
@@ -26,29 +25,37 @@ class BlinkClicker:
     def reset(self) -> None:
         self.closed = False
         self.progress = 0.0
-        self.unstable = False
         self._closed_since = None
         self._fired_this_close = False
         self._blinks.clear()
 
     def update(self, ear: float, now: float, allow: bool) -> bool:
-        close_thresh = max(0.10, self.open_ear * 0.55)
-        open_thresh = max(0.13, self.open_ear * 0.74)
-        squint_thresh = max(0.16, self.open_ear * 0.85)
+        if self.open_ear <= 0.0:
+            if ear > 0.05:
+                self._boot.append(ear)
+            if len(self._boot) < self.BOOT_FRAMES:
+                self.closed = False
+                self.progress = 0.0
+                return False
+            self.open_ear = sorted(self._boot)[len(self._boot) // 2]
+
+        close_thresh = self.open_ear * 0.48
+        open_thresh = self.open_ear * 0.68
 
         if ear > open_thresh:
-            self._nudge_open(ear)
+            self.open_ear = 0.97 * self.open_ear + 0.03 * ear
 
         if self.closed:
             closed = ear < open_thresh
         else:
             closed = ear < close_thresh
         self.closed = closed
-        self.unstable = ear < squint_thresh
 
         if not allow:
-            self.reset()
-            self.unstable = ear < squint_thresh
+            self.progress = 0.0
+            self._closed_since = None
+            self._fired_this_close = False
+            self.closed = False
             return False
 
         if closed:
@@ -76,6 +83,3 @@ class BlinkClicker:
         self._closed_since = None
         self._fired_this_close = False
         return fired
-
-    def _nudge_open(self, ear: float) -> None:
-        self.open_ear = 0.92 * self.open_ear + 0.08 * ear
