@@ -35,7 +35,7 @@ class PointerState:
     seen: bool = False
     dwell_progress: float = 0.0  # 0–1 while holding still
     dwell_ms: int = 1100
-    gain: float = 12.0
+    gain: float = 16.0
     last_click_ms: int | None = None
     hits: int = 0
     clicks: int = 0
@@ -52,7 +52,7 @@ class HeadPointer:
         self.fy = OneEuro(min_cutoff=0.55, beta=0.008)
         self.rest_x = 0.5
         self.rest_y = 0.45
-        self.gain = 12.0
+        self.gain = 16.0
         self.paused = True
         self.click_enabled = False
         self._ever_centered = False
@@ -90,7 +90,7 @@ class HeadPointer:
             self.mouse.position = (int(self._out[0]), int(self._out[1]))
 
     def nudge_gain(self, delta: float) -> None:
-        self.gain = max(2.0, min(40.0, self.gain + delta))
+        self.gain = max(2.0, min(50.0, self.gain + delta))
 
     def toggle_clicks(self) -> None:
         self.click_enabled = not self.click_enabled
@@ -114,7 +114,20 @@ class HeadPointer:
         self._out = None
         self._prev_pos = None
 
-    def update(self, nx: float, ny: float, seen: bool, now: float) -> PointerState:
+    def blink_click(self, now: float) -> None:
+        if self.paused:
+            return
+        pos = self.mouse.position
+        self._click(now, float(pos[0]), float(pos[1]), kind="blink")
+
+    def update(
+        self,
+        nx: float,
+        ny: float,
+        seen: bool,
+        now: float,
+        freeze: bool = False,
+    ) -> PointerState:
         if self._pending_judge is not None:
             click_t, cx, cy = self._pending_judge
             if now - click_t >= 0.4:
@@ -135,6 +148,9 @@ class HeadPointer:
 
         if not seen or self.paused:
             self._still_since = None
+            return self._state(seen, progress)
+
+        if freeze:
             return self._state(seen, progress)
 
         raw_x = self.screen_w * 0.5 + (nx - self.rest_x) * self.screen_w * (self.gain / 10.0)
@@ -187,7 +203,7 @@ class HeadPointer:
 
         return self._state(seen, progress)
 
-    def _click(self, now: float, sx: float, sy: float) -> None:
+    def _click(self, now: float, sx: float, sy: float, kind: str = "dwell") -> None:
         self.mouse.click(Button.left, 1)
         self.clicks += 1
         self.last_click_ms = int(self.dwell_s * 1000)
@@ -195,7 +211,7 @@ class HeadPointer:
         self._last_click_pos = (sx, sy)
         self._pending_judge = (now, sx, sy)
         self._still_since = None
-        self._log("click", hit=None)
+        self._log(kind, hit=None)
 
     def _state(self, seen: bool, progress: float) -> PointerState:
         pos = self.mouse.position
