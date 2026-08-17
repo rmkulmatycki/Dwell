@@ -1,23 +1,25 @@
-"""Intentional blink → click.
+"""Blink → click, tuned for webcam MediaPipe (eyes never look fully shut).
 
-Calibrates to your open-eye size first so a normal face is not treated as
-always-blinking (that froze the cursor).
+A blink is a quick dip below your recent open-eye level, then back up.
+Two dips in about a second = click. A held dip also clicks.
 """
 
 from __future__ import annotations
 
+from collections import deque
+
 
 class BlinkClicker:
-    LONG_S = 0.50
-    BLINK_MIN_S = 0.04
-    DOUBLE_S = 0.95
-    BOOT_FRAMES = 12
+    LONG_S = 0.40
+    BLINK_MIN_S = 0.03
+    DOUBLE_S = 1.10
 
     def __init__(self) -> None:
-        self.open_ear = 0.0
         self.closed = False
         self.progress = 0.0
-        self._boot: list[float] = []
+        self.ear = 0.0
+        self.open_level = 0.0
+        self._hist: deque[float] = deque(maxlen=45)
         self._closed_since: float | None = None
         self._fired_this_close = False
         self._blinks: list[float] = []
@@ -30,32 +32,25 @@ class BlinkClicker:
         self._blinks.clear()
 
     def update(self, ear: float, now: float, allow: bool) -> bool:
-        if self.open_ear <= 0.0:
-            if ear > 0.05:
-                self._boot.append(ear)
-            if len(self._boot) < self.BOOT_FRAMES:
-                self.closed = False
-                self.progress = 0.0
-                return False
-            self.open_ear = sorted(self._boot)[len(self._boot) // 2]
+        self.ear = ear
+        if ear > 0.04:
+            self._hist.append(ear)
+        if len(self._hist) < 8:
+            self.open_level = ear
+            self.closed = False
+            return False
 
-        close_thresh = self.open_ear * 0.48
-        open_thresh = self.open_ear * 0.68
-
-        if ear > open_thresh:
-            self.open_ear = 0.97 * self.open_ear + 0.03 * ear
-
-        if self.closed:
-            closed = ear < open_thresh
-        else:
-            closed = ear < close_thresh
+        ordered = sorted(self._hist)
+        self.open_level = ordered[int(len(ordered) * 0.80)]
+        # Webcam blinks only dip a little. Catch a relative drop OR a small absolute drop.
+        thresh = min(self.open_level * 0.86, self.open_level - 0.025)
+        closed = ear < thresh
         self.closed = closed
 
         if not allow:
             self.progress = 0.0
             self._closed_since = None
             self._fired_this_close = False
-            self.closed = False
             return False
 
         if closed:

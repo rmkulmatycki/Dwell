@@ -11,13 +11,14 @@ This is **not** a medical device.
 1. Double-click `run.bat`. Allow the camera.
 2. A small camera HUD sits in the top-right and should **not** steal focus from Cursor.
 3. Look at the middle of the monitor, press **F8** (or **Ctrl+Alt+P**).
-4. Tilt your head to move the cursor. **Double-blink** to click.
+4. Tilt your head to move the cursor. **Double-blink** to click, or press **F1**.
 5. **F7** recenters if you shift in your chair. **F10** quits.
 
 Type normally. Dwell only listens to F-keys and Ctrl+Alt shortcuts.
 
 | Key | Backup | What it does |
 |-----|--------|----------------|
+| F1 | Ctrl+Alt+C | Click (hands stay on keys) |
 | F8 | Ctrl+Alt+P | Start / pause |
 | F7 | Ctrl+Alt+R | Recenter |
 | F6 | Ctrl+Alt+T | Target practice |

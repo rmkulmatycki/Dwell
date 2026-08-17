@@ -87,7 +87,7 @@ class FaceTracker:
         lm = result.multi_face_landmarks[0].landmark
         h, w = frame.shape[:2]
         nose = lm[NOSE_TIP]
-        ear = 0.5 * (_ear(lm, LEFT_EYE) + _ear(lm, RIGHT_EYE))
+        ear = min(_ear(lm, LEFT_EYE), _ear(lm, RIGHT_EYE))
         if ear > self._open_ear * 0.9:
             self._open_ear = 0.95 * self._open_ear + 0.05 * ear
         squint = ear < self._open_ear * 0.85

@@ -12,9 +12,15 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from pynput.mouse import Button, Controller
+from pynput.mouse import Controller
 
 from dwell.filters import OneEuro
+
+
+def _send_left_click() -> None:
+    # pynput click is ignored by some apps; this is the real Windows click.
+    ctypes.windll.user32.mouse_event(0x0002, 0, 0, 0, 0)
+    ctypes.windll.user32.mouse_event(0x0004, 0, 0, 0, 0)
 
 
 def _screen_size() -> tuple[int, int]:
@@ -132,8 +138,8 @@ class HeadPointer:
         self._out = None
         self._prev_pos = None
 
-    def blink_click(self, now: float) -> None:
-        if self.paused:
+    def blink_click(self, now: float, ignore_pause: bool = False) -> None:
+        if self.paused and not ignore_pause:
             return
         pos = self.mouse.position
         self._click(now, float(pos[0]), float(pos[1]), kind="blink")
@@ -222,7 +228,8 @@ class HeadPointer:
         return self._state(seen, progress)
 
     def _click(self, now: float, sx: float, sy: float, kind: str = "dwell") -> None:
-        self.mouse.click(Button.left, 1)
+        self.mouse.position = (int(sx), int(sy))
+        _send_left_click()
         self.clicks += 1
         self.last_click_ms = int(self.dwell_s * 1000)
         self._last_click_t = now

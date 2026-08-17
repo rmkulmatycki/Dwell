@@ -28,6 +28,7 @@ _VK_LETTER = {
     84: "t",
     71: "g",
     81: "q",
+    67: "c",
 }
 
 
@@ -52,7 +53,7 @@ def main() -> int:
     mods: set[str] = set()
 
     def on_press(key: keyboard.Key | keyboard.KeyCode | None) -> None:
-        nonlocal running
+        nonlocal running, flash_until
         if key in _CTRL:
             mods.add("ctrl")
             return
@@ -85,6 +86,10 @@ def main() -> int:
                 return
             if key == keyboard.Key.f4 or (chord and getattr(key, "vk", None) in (187, 107)):
                 pointer.nudge_gain(2.0)
+                return
+            if key == keyboard.Key.f1 or (chord and letter == "c"):
+                pointer.blink_click(time.perf_counter(), ignore_pause=True)
+                flash_until = time.perf_counter() + 0.45
                 return
             if key == keyboard.Key.f9:
                 pointer.toggle_clicks()
@@ -133,7 +138,9 @@ def main() -> int:
             if fired:
                 pointer.blink_click(now)
                 flash_until = now + 0.45
+            # F1 click also increments; keep the flash if clicks just happened.
             if pointer.clicks > before_clicks:
+                flash_until = now + 0.45
                 practice.on_click(state.x, state.y)
 
             _draw_hud(frame, state, face, blinker, now < flash_until)
@@ -170,7 +177,7 @@ def _draw_hud(frame, state, face, blinker: BlinkClicker, flash: bool) -> None:
         color = (0, 200, 255)
         steps = [
             "Look at screen center. F8 (or Ctrl+Alt+P) starts.",
-            "Tilt your head to move. Double-blink to click.",
+            "Tilt your head to move. Double-blink or F1 to click.",
             "F7 recenter  F3/F4 speed  F10 quit",
         ]
     else:
@@ -178,8 +185,8 @@ def _draw_hud(frame, state, face, blinker: BlinkClicker, flash: bool) -> None:
         color = (0, 220, 120)
         hit_txt = f"{state.hits}/{state.clicks}" if state.clicks else "0/0"
         steps = [
-            f"Gain {state.gain:.1f}   clicks {hit_txt}    F8 pause   F7 recenter",
-            "Double-blink to click. Hold shut if the bar is easier.",
+            f"Gain {state.gain:.1f}  clicks {hit_txt}  ear {blinker.ear:.2f}/{blinker.open_level:.2f}  F1 click",
+            "Double-blink to click, or hold eyes until the bar fills",
         ]
         if flash:
             mode = "CLICK"
