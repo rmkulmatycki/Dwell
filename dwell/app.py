@@ -113,6 +113,7 @@ def main() -> int:
     cv2.resizeWindow(HUD, hud_w, hud_h)
     cv2.moveWindow(HUD, hud_x, hud_y)
     last_pin = 0.0
+    last_lost = 0.0
 
     try:
         while running:
@@ -131,8 +132,18 @@ def main() -> int:
                 print(f"Practice window failed: {exc}")
 
             now = time.perf_counter()
-            fired = blinker.update(face.ear, now, allow=face.seen and not pointer.paused)
-            freeze = blinker.closed
+            if not face.seen:
+                last_lost = now
+            looking_down = face.seen and (face.y - pointer.rest_y) > 0.045
+            face_recent = (now - last_lost) > 0.55
+            allow_blink = (
+                face.seen
+                and not pointer.paused
+                and face_recent
+                and not looking_down
+            )
+            fired = blinker.update(face.ear, now, allow=allow_blink)
+            freeze = blinker.closed or looking_down or not face.seen or not face_recent
             before_clicks = pointer.clicks
             state = pointer.update(face.x, face.y, face.seen, now, freeze=freeze)
             if fired:
@@ -143,7 +154,15 @@ def main() -> int:
                 flash_until = now + 0.45
                 practice.on_click(state.x, state.y)
 
-            _draw_hud(frame, state, face, blinker, now < flash_until)
+            _draw_hud(
+                frame,
+                state,
+                face,
+                blinker,
+                now < flash_until,
+                looking_down=looking_down,
+                face_lost=not face.seen,
+            )
             cv2.imshow(HUD, frame)
             if now - last_pin > 1.0:
                 pin_overlay(HUD, hud_x, hud_y, hud_w, hud_h)
@@ -161,17 +180,29 @@ def main() -> int:
         cv2.destroyAllWindows()
 
 
-def _draw_hud(frame, state, face, blinker: BlinkClicker, flash: bool) -> None:
+def _draw_hud(
+    frame,
+    state,
+    face,
+    blinker: BlinkClicker,
+    flash: bool,
+    looking_down: bool = False,
+    face_lost: bool = False,
+) -> None:
     h, w = frame.shape[:2]
     panel_h = 222 if state.paused else 148
     overlay = frame.copy()
     cv2.rectangle(overlay, (0, 0), (w, panel_h), (0, 0, 0), -1)
     cv2.addWeighted(overlay, 0.72, frame, 0.28, 0, frame)
 
-    if not face.seen:
-        mode = "NO FACE — sit in the light, green dot on your nose"
+    if face_lost or not face.seen:
+        mode = "LOOK AT THE SCREEN — clicks off (face not in camera)"
         color = (0, 80, 255)
-        steps = ["Tiny camera HUD. Type in Cursor. F8 starts the mouse."]
+        steps = ["Glance at the keys is fine. Cursor and blink-click freeze until you're back."]
+    elif looking_down:
+        mode = "LOOKING DOWN — clicks off so the keyboard is safe"
+        color = (0, 200, 255)
+        steps = ["Look back at the monitor to move and blink-click again. F1 still clicks."]
     elif state.paused:
         mode = "PAUSED — nose tracking. Keyboard is yours."
         color = (0, 200, 255)
@@ -181,12 +212,12 @@ def _draw_hud(frame, state, face, blinker: BlinkClicker, flash: bool) -> None:
             "F7 recenter  F3/F4 speed  F10 quit",
         ]
     else:
-        mode = "LIVE — nose moves cursor, blink clicks"
+        mode = "LIVE — nose moves cursor, double-blink clicks"
         color = (0, 220, 120)
         hit_txt = f"{state.hits}/{state.clicks}" if state.clicks else "0/0"
         steps = [
             f"Gain {state.gain:.1f}  clicks {hit_txt}  ear {blinker.ear:.2f}/{blinker.open_level:.2f}  F1 click",
-            "Double-blink to click, or hold eyes until the bar fills",
+            "Two quick blinks = click. Looking at the keys will not click.",
         ]
         if flash:
             mode = "CLICK"
