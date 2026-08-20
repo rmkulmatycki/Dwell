@@ -14,7 +14,7 @@ This is **not** a medical device.
 4. Tilt your head to move the cursor. **Double-blink** to click, or press **F1**.
 5. **F7** recenters if you shift in your chair. **F10** quits.
 
-Type normally. Dwell only listens to F-keys and Ctrl+Alt shortcuts.
+Type normally. While you are typing, blink-clicks pause for a moment so looking at the keys does not click by itself. Dwell only listens to F-keys and Ctrl+Alt shortcuts for commands.
 
 | Key | Backup | What it does |
 |-----|--------|----------------|

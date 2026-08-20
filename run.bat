@@ -24,7 +24,7 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 echo.
 echo Starting Dwell. Allow the webcam if Windows asks.
-echo F8 turns the mouse on. Esc quits.
+echo F8 turns the mouse on. F10 quits.
 echo.
 python -m dwell
 echo.
